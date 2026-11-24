@@ -98,6 +98,12 @@ run "E1. JIT 금지 + --full-aot-interp (Test.exe AOT 없음) basic" "통과하�
 run "E2. 같은 조건 callback" "reverse P/Invoke 래퍼 필요 여부" ./mono-nojit --full-aot-interp Test.exe callback
 mv Test.exe.dylib.off Test.exe.dylib 2>/dev/null
 
+# H. 원인 가르기: JIT 를 허용한 상태에서도 인터프리터가 인자를 깨뜨리는가?
+#    (깨지면 이 Mono 포크의 인터프리터 자체 문제, 안 깨지면 JIT 금지/AOT 조합 문제)
+run "H1. JIT 허용 + --interpreter (순수 인터프리터)" "진단" "$MONO" --interpreter Test.exe all
+run "H2. JIT 허용 + --full-aot-interp" "진단" "$MONO" --full-aot-interp Test.exe all
+run "H3. JIT 허용 + --hybrid-aot (AOT+JIT, 인터프리터 없음)" "진단" "$MONO" --hybrid-aot Test.exe basic
+
 # G. mscorlib 도 인터프리터로: 빈 AOT 프로필 + profile-only -> 메서드 코드 없이 트램폴린/래퍼만.
 #    인터프리터 -> AOT 코드 직접 호출(do_jit_call -> gsharedvt_out_sig) 경로가 없어진다 (D 에서 인자가 깨지는 경로)
 printf 'AOTPROFILE' > empty.aotprofile
