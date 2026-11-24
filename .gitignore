@@ -1,0 +1,12 @@
+# 게임 파일 (사용자 본인 스팀 계정으로 받은 것) - 절대 커밋하지 않음
+/mac/
+/game/
+*.app/
+# 빌드 산출물
+/build/
+/out/
+*.dylib
+*.o
+*.exe
+*.so
+.DS_Store

@@ -1,0 +1,72 @@
+name: mono-interp (1단계 검증)
+
+# 게임과 같은 커밋의 Unity Mono를 빌드하고, JIT 권한이 없는 프로세스에서
+# MONO_AOT_MODE_INTERP(인터프리터 + AOT 트램폴린)로 돌아가는지 검증한다.
+# 게임 파일은 쓰지 않는다 (오픈소스 Mono + 테스트 코드만).
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - ci/**
+      - tests/interp/**
+      - .github/workflows/mono-interp.yml
+
+env:
+  MONO_REPO: Unity-Technologies/mono
+  MONO_COMMIT: 9d7c9afd266e523029fb0cab48e944e528e61e68   # 게임 v3.4.0 libmonobdwgc 의 explicit/9d7c9afd
+
+jobs:
+  interp:
+    runs-on: macos-15
+    timeout-minutes: 330
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 빌드 캐시
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: build/mono-prefix
+          key: unity-mono-${{ env.MONO_COMMIT }}-${{ hashFiles('ci/build-mono.sh') }}
+
+      - name: 도구 설치
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          brew install autoconf automake libtool pkg-config cmake mono || true
+          which mcs autoconf automake libtoolize cmake
+
+      - name: Unity Mono 소스 (게임과 같은 커밋)
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          git init -q mono-src && cd mono-src
+          git remote add origin https://github.com/$MONO_REPO.git
+          git fetch -q --depth 1 origin $MONO_COMMIT
+          git checkout -q FETCH_HEAD
+          # 빌드에 필요 없는 큰 서브모듈 제외 (llvm, boringssl, 테스트 바이너리)
+          skip="external/llvm-project external/boringssl external/helix-binaries external/illinker-test-assets external/xunit-binaries external/bockbuild"
+          for p in $(git config -f .gitmodules --get-regexp 'submodule\..*\.path' | awk '{print $2}'); do
+            case " $skip " in *" $p "*) continue;; esac
+            git submodule update --init --depth 1 -- "$p" || git submodule update --init -- "$p"
+          done
+          git submodule status
+
+      - name: Mono 빌드
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: bash ci/build-mono.sh mono-src build/mono-prefix 2>&1 | tee build-mono.log | grep -E '^>>>|error:|Error |\*\*\*' || true; test -x build/mono-prefix/bin/mono
+
+      - name: 빌드 로그 (실패 시)
+        if: failure()
+        run: tail -200 build-mono.log || true
+
+      - name: 인터프리터 검증
+        run: bash ci/test-interp.sh build/mono-prefix build/interp-test
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: interp-test
+          path: |
+            build/interp-test/summary.md
+            build-mono.log
+          if-no-files-found: ignore
