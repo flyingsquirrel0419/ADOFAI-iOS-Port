@@ -86,7 +86,35 @@ static void *shim_dlopen(const char *path, int mode) {
     return h;
 }
 
+// ---------------------------------------------------------------- 실행 가능 익명 메모리 요청 정리
+// Mono 는 인터프리터 모드에서도 코드와 상관없는 메모리(해저드 포인터 테이블, 코드 매니저 예약 등)를
+// MAP_JIT 나 PROT_EXEC 로 잡는다. iOS 는 이걸 거부해서 Mono 초기화가 assert 로 죽는다
+// (CI: "Assertion at hazard-pointer.c:131, condition `hazard_table != NULL'").
+// 실행 권한만 떼고 할당해 준다. Mono 가 정말 그 메모리에서 코드를 실행하려 하면 그 자리에서 크래시가 난다.
+#include <sys/mman.h>
+static void *shim_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off) {
+    if ((flags & MAP_JIT) || ((prot & PROT_EXEC) && (flags & MAP_ANON))) {
+        static int n;
+        if (n++ < 6) ShimLog("mono: mmap(len=%zu prot=%#x flags=%#x) -> without JIT/EXEC", len, prot, flags);
+        flags &= ~MAP_JIT; prot &= ~PROT_EXEC;
+    }
+    return mmap(addr, len, prot, flags, fd, off);
+}
+static int shim_mprotect(void *addr, size_t len, int prot) {
+    if (prot & PROT_EXEC) {
+        static int n;
+        if (n++ < 6) ShimLog("mono: mprotect(%p, %zu, %#x) -> without EXEC", addr, len, prot);
+        prot &= ~PROT_EXEC;
+    }
+    return mprotect(addr, len, prot);
+}
+static void shim_jit_write_protect(int enabled) { ShimLogOnce("jitwp", "mono: pthread_jit_write_protect_np(%d) ignored", enabled); }
+
 void ShimMonoInstall(void) {
+    // libmonobdwgc 는 UnityPlayer 가 나중에 dlopen 한다 -> 로드될 때 import 슬롯을 바꾼다
+    ShimHookLater("libmonobdwgc", "mmap", (void *)shim_mmap);
+    ShimHookLater("libmonobdwgc", "mprotect", (void *)shim_mprotect);
+    ShimHookLater("libmonobdwgc", "pthread_jit_write_protect_np", (void *)shim_jit_write_protect);
     real_dlsym = (void *(*)(void *, const char *))dlsym(RTLD_DEFAULT, "dlsym");
     void *orig;
     ShimHookImport("UnityPlayer", "dlsym", (void *)shim_dlsym, &orig);

@@ -35,11 +35,11 @@ extern void mono_set_dirs(const char *assembly_dir, const char *config_dir);
 int main(int argc, char *argv[]) { return mono_main(argc, argv); }
 EOF
 xcrun clang -arch arm64 "$W/aotdrv.c" -o "$W/aotdrv" "$LIB" -Wl,-rpath,"$(dirname "$LIB")"
-cp "$PREFIX/lib/mono/$PROF/mscorlib.dll" "$W/"
-
-cd "$W"
+# 컴파일은 mscorlib 이 원래 있는 곳에서 (복사본이면 "doesn't match original file name")
 echo ">>> AOT mscorlib (full,interp,static,asmonly)"
-MONO_PATH="$PREFIX/lib/mono/$PROF" ./aotdrv --aot=full,interp,static,asmonly,outfile=mscorlib.s mscorlib.dll 2>&1 | tail -20
+( cd "$PREFIX/lib/mono/$PROF" && "$W/aotdrv" --aot=full,interp,static,asmonly,outfile="$W/mscorlib.s" mscorlib.dll ) 2>&1 | tail -20
+cp "$PREFIX/lib/mono/$PROF/mscorlib.dll" "$W/"
+cd "$W"
 ls -la mscorlib.s
 echo ">>> runtime_version / gc in image:"
 grep -a -m3 -E '6\.13\.0 \(|"boehm"|boehm' mscorlib.s || true
