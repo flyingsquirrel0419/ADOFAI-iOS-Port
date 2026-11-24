@@ -188,7 +188,10 @@ def retarget(src, dst, minos, sdk):
                 new = "@rpath/" + old.split("/")[-1]
             if new and new != old:
                 nb = new.encode() + b"\0"
-                if no + len(nb) > sz: raise SystemExit("replacement too long: %s -> %s" % (old, new))
+                if no + len(nb) > sz:
+                    if cmd == LC_RPATH:   # 자리가 모자란 rpath 는 그대로 둔다 (없는 경로는 dyld 가 건너뛴다)
+                        log.append("rpath %s kept (no room for %s)" % (old, new)); continue
+                    raise SystemExit("replacement too long: %s -> %s" % (old, new))
                 d[off + no: off + sz] = nb + b"\0" * (sz - no - len(nb))
                 log.append("%s -> %s" % (old, new))
     if not seen: raise SystemExit("no LC_BUILD_VERSION")

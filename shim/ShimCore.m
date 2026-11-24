@@ -118,6 +118,34 @@ static void OnImageAdded(const struct mach_header *mh, intptr_t slide) {
     }
 }
 
+// ---------------------------------------------------------------- 게임 데이터 위치
+// 2.6 GB 게임 데이터를 테스트 빌드마다 옮기지 않도록, 데이터는 Documents/ADOFAIData 에 한 번 넣어 두고
+// 앱 번들의 Contents/Resources/Data 를 거기로 잇는다 (LiveContainer 에서는 앱 번들에 쓸 수 있다).
+static void LinkGameData(void) {
+    NSFileManager *fm = NSFileManager.defaultManager;
+    NSString *bundleData = [[NSBundle mainBundle].bundlePath stringByAppendingPathComponent:@"Contents/Resources/Data"];
+    NSString *docData = [DocumentsDir() stringByAppendingPathComponent:@"ADOFAIData"];
+    NSDictionary *attr = [fm attributesOfItemAtPath:bundleData error:nil];
+    BOOL isLink = [attr[NSFileType] isEqual:NSFileTypeSymbolicLink];
+    if (attr && !isLink) { ShimLog("data: in app bundle"); return; }
+    BOOL dir = NO;
+    if (![fm fileExistsAtPath:[docData stringByAppendingPathComponent:@"globalgamemanagers"] isDirectory:&dir]) {
+        ShimLog("data: NOT FOUND. Put the game's Data folder at %s (Files app: this app's Documents/ADOFAIData)", docData.UTF8String);
+        return;
+    }
+    if (isLink) {
+        NSString *dst = [fm destinationOfSymbolicLinkAtPath:bundleData error:nil];
+        if ([dst isEqualToString:docData]) { ShimLog("data: linked to Documents/ADOFAIData"); return; }
+        [fm removeItemAtPath:bundleData error:nil];
+    }
+    [fm createDirectoryAtPath:bundleData.stringByDeletingLastPathComponent withIntermediateDirectories:YES attributes:nil error:nil];
+    NSError *e = nil;
+    if ([fm createSymbolicLinkAtPath:bundleData withDestinationPath:docData error:&e])
+        ShimLog("data: linked app bundle Contents/Resources/Data -> Documents/ADOFAIData");
+    else
+        ShimLog("data: could not link (%s) - app bundle not writable? Use the full IPA instead", e.localizedDescription.UTF8String);
+}
+
 // ---------------------------------------------------------------- 시작
 __attribute__((constructor)) static void ShimInit(void) {
     struct utsname u; uname(&u);
@@ -126,6 +154,7 @@ __attribute__((constructor)) static void ShimInit(void) {
             u.machine, UIDevice.currentDevice.systemVersion.UTF8String,
             [NSBundle mainBundle].bundlePath.UTF8String,
             [info[@"CFBundleShortVersionString"] ?: @"?" UTF8String]);
+    LinkGameData();
     ShimMonoInstall();
     ShimAudioInstall();
     _dyld_register_func_for_add_image(OnImageAdded);

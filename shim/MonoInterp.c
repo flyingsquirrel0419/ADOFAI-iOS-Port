@@ -8,6 +8,7 @@
 //   mono_aot_only = TRUE, mono_use_interpreter = TRUE, use_aot_trampolines = TRUE
 //   -> C# 는 인터프리터, 트램폴린은 mscorlib.dll.dylib 등 AOT 이미지에서. 실행 중 코드 생성 없음.
 #include <dlfcn.h>
+#include <stdio.h>
 #include <string.h>
 #include "Shim.h"
 
@@ -21,7 +22,33 @@ static void *(*real_dlsym)(void *, const char *);
 static void *(*real_init)(const char *, const char *);
 static void *g_monoHandle;
 
+// 정적 AOT 모듈 등록: Contents/Frameworks/libADOFAIAot.dylib 에 링크된 mscorlib 의 AOT 이미지
+// (--aot=interp,static 으로 만든 것; CI mono-interp 산출물). 경로 검색 대신 mono_aot_register_module 로 넘긴다.
+static void RegisterAotModules(void) {
+    void (*reg)(void **) = (void (*)(void **))real_dlsym(g_monoHandle ?: RTLD_DEFAULT, "mono_aot_register_module");
+    if (!reg) { ShimLog("mono: mono_aot_register_module not found"); return; }
+    // LiveContainer 에서는 게임 실행 파일이 dlopen 되므로 @rpath 대신 shim 과 같은 폴더의 절대 경로를 쓴다
+    Dl_info di; char path[1024] = "libADOFAIAot.dylib";
+    if (dladdr((void *)RegisterAotModules, &di) && di.dli_fname) {
+        snprintf(path, sizeof path, "%s", di.dli_fname);
+        char *slash = strrchr(path, '/');
+        if (slash) snprintf(slash + 1, sizeof path - (size_t)(slash + 1 - path), "libADOFAIAot.dylib");
+    }
+    void *h = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
+    if (!h) { ShimLog("mono: libADOFAIAot.dylib not loaded (%s) - interpreter needs the mscorlib AOT image", dlerror() ?: "?"); return; }
+    static const char *mods[] = { "mscorlib", "System", "System.Core", "Mono.Security", NULL };   // aname 그대로 (aot-compiler.c)
+    for (int i = 0; mods[i]; i++) {
+        char sym[128];
+        snprintf(sym, sizeof sym, "mono_aot_module_%s_info", mods[i]);
+        void **info = (void **)dlsym(h, sym);
+        if (!info) continue;
+        reg(info);
+        ShimLog("mono: registered static AOT module %s", mods[i]);
+    }
+}
+
 static void *shim_mono_jit_init_version(const char *domain, const char *version) {
+    RegisterAotModules();
     int mode = (int)ShimCfgNum("MonoAotMode", MONO_AOT_MODE_INTERP);
     void (*set_mode)(int) = (void (*)(int))real_dlsym(g_monoHandle ?: RTLD_DEFAULT, "mono_jit_set_aot_mode");
     if (set_mode && mode >= 0) {
