@@ -15,17 +15,18 @@ OUT=$2; mkdir -p "$OUT"; OUT=$(cd "$OUT" && pwd)
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 W=$(mktemp -d)
 
-LIB=$(ls "$PREFIX"/lib/libmonobdwgc-2.0.dylib "$PREFIX"/lib/libmonoboehm-2.0.dylib 2>/dev/null | head -1 || true)
+LIB=$(ls "$PREFIX"/lib/libmonoboehm-2.0.dylib "$PREFIX"/lib/libmonobdwgc-2.0.dylib 2>/dev/null | head -1 || true)
 [ -n "$LIB" ] || { echo "no Boehm runtime dylib in $PREFIX/lib:"; ls "$PREFIX/lib"; exit 1; }
 echo ">>> runtime: $LIB"
 
 # 게임이 쓰는 클래스 라이브러리 프로필 (Unity 맥 플레이어: unityjit-macos). 없으면 4.5
 PROF=""
-for p in unityjit-macos unityjit 4.5; do [ -f "$PREFIX/lib/mono/$p/mscorlib.dll" ] && { PROF=$p; break; }; done
+for p in 4.5 unityjit-macos unityjit; do   # make install 이 4.5/ 에 unityjit-macos 를 넣는다 [ -f "$PREFIX/lib/mono/$p/mscorlib.dll" ] && { PROF=$p; break; }; done
 [ -n "$PROF" ] || { echo "no mscorlib.dll"; ls "$PREFIX/lib/mono"; exit 1; }
 echo ">>> profile: $PROF"
 for p in "$PREFIX"/lib/mono/*/mscorlib.dll; do echo "    $(stat -f %z "$p") $p"; done
 
+[ -e "$PREFIX/lib/mono/net_4_x-macos" ] || ln -s 4.5 "$PREFIX/lib/mono/net_4_x-macos"   # test-interp.sh 참고
 cat > "$W/aotdrv.c" <<'EOF'
 // mono_main 만 부르는 임베딩 드라이버: mono_build_date 를 설정하지 않아 runtime_version 이 게임 런타임과 같아진다
 extern int mono_main(int argc, char *argv[]);

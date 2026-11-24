@@ -24,6 +24,10 @@ log "- profiles: $(ls "$PREFIX/lib/mono" | tr '\n' ' ')"
 log "- runtime libs: $(ls "$PREFIX/lib" | grep -E 'libmono.*dylib$' | tr '\n' ' ')"
 log ""
 
+# Unity 빌드의 런타임은 클래스 라이브러리를 lib/mono/net_4_x-macos 에서 찾는다 (Unity 패키징 스크립트가 만드는 폴더).
+# make install 은 4.5/ 에 unityjit-macos 프로필(게임과 같은 프로필)을 넣으므로 그리로 잇는다.
+[ -e "$PREFIX/lib/mono/net_4_x-macos" ] || ln -s 4.5 "$PREFIX/lib/mono/net_4_x-macos"
+
 # --- 진단: 클래스 라이브러리 로딩 ---
 echo "::group::corlib 진단"
 ls -la "$PROFILE_DIR"/mscorlib* "$PROFILE_DIR"/mcs.exe 2>&1
