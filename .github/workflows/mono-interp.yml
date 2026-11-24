@@ -9,7 +9,7 @@ on:
     inputs:
       opt:
         description: "Mono C 최적화 (-Os 기본, -O0 / -O1 로 인터프리터 진단)"
-        default: "-Os"
+        default: "-O0"
   push:
     paths:
       - ci/build-mono.sh
@@ -19,7 +19,7 @@ on:
       - .github/workflows/mono-interp.yml
 
 env:
-  MONO_OPT: ${{ inputs.opt || '-Os' }}
+  MONO_OPT: ${{ inputs.opt || '-O0' }}   # -Os 는 최신 clang 에서 인터프리터가 깨짐 (CI 진단 H1)
   MONO_REPO: Unity-Technologies/mono
   MONO_COMMIT: 9d7c9afd266e523029fb0cab48e944e528e61e68   # 게임 v3.4.0 libmonobdwgc 의 explicit/9d7c9afd
 

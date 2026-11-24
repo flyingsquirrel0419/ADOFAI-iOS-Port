@@ -129,6 +129,30 @@ run "G2. 같은 조건, Test.exe AOT 없음 (게임 DLL 역할)" "전부 통과"
 mv Test.exe.dylib.off Test.exe.dylib 2>/dev/null
 cp mscorlib.full.dylib "$PROFILE_DIR/mscorlib.dll.dylib"
 
+# I. 기기와 같은 방식: 임베딩 호스트 + 정적 AOT 모듈 등록 + MONO_AOT_MODE_INTERP (tests/interp/host.c)
+#    AOT 이미지는 build-aot-ios.sh 와 같이 빌드 날짜 없는 드라이버로 --aot=full,interp,static 컴파일 (여기서는 macOS 용으로 링크)
+LIBB="$PREFIX/lib/libmonoboehm-2.0.dylib"
+printf 'extern int mono_main(int, char **);\nint main(int c, char **v) { return mono_main(c, v); }\n' > aotdrv.c
+xcrun clang -arch arm64 aotdrv.c -o aotdrv "$LIBB" -Wl,-rpath,"$PREFIX/lib"
+echo "::group::static AOT mscorlib"
+( cd "$PROFILE_DIR" && "$W/aotdrv" --aot=full,interp,static,asmonly,outfile="$W/mscorlib_static.s" mscorlib.dll ) 2>&1 | tail -5
+grep -a -m2 -oE '6\.13\.0 \([^)"]*\)' mscorlib_static.s || true
+echo "::endgroup::"
+xcrun clang -arch arm64 -c mscorlib_static.s -o mscorlib_static.o && \
+xcrun clang -arch arm64 -dynamiclib mscorlib_static.o -o libaot_mac.dylib "$LIBB" -Wl,-rpath,"$PREFIX/lib" && \
+xcrun clang -arch arm64 "$HERE/tests/interp/host.c" -o host "$LIBB" -Wl,-rpath,"$PREFIX/lib"
+log "- static AOT image runtime_version: \`$(grep -a -m1 -oE '6\.13\.0 \([^)"]*\)' mscorlib_static.s)\`"
+mv "$PROFILE_DIR/mscorlib.dll.dylib" mscorlib.filebased.dylib   # 파일 기반 AOT 이미지는 치워서 정적 등록만 쓰이게
+mv Test.exe.dylib Test.exe.dylib.off 2>/dev/null
+cat > host-nojit <<EOS
+#!/bin/bash
+DYLD_INSERT_LIBRARIES="$W/libnojit.dylib" exec "$W/host" "\$@"
+EOS
+chmod +x host-nojit
+run "I1. 기기 방식: 호스트 + 정적 AOT 등록 + INTERP, JIT 금지" "전부 통과" ./host-nojit "$W/libaot_mac.dylib" "$PROFILE_DIR" Test.exe all
+mv mscorlib.filebased.dylib "$PROFILE_DIR/mscorlib.dll.dylib"
+mv Test.exe.dylib.off Test.exe.dylib 2>/dev/null
+
 # F. 성능: JIT 대비 인터프리터
 run "F1. bench JIT" "-" "$MONO" Test.exe bench
 run "F2. bench interp (JIT 금지)" "-" ./mono-nojit --full-aot-interp Test.exe bench
