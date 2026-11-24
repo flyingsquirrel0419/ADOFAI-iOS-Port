@@ -1,0 +1,25 @@
+name: shim (iOS)
+
+# libADOFAIShim.dylib (iOS arm64) 빌드. 게임 파일은 쓰지 않는다.
+# 산출물은 사용자가 자기 서버/PC에서 tools/make_app.py 로 본인 게임 파일과 합친다.
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - shim/**
+      - ci/build-shim.sh
+      - .github/workflows/shim.yml
+
+jobs:
+  shim:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: 빌드
+        run: bash ci/build-shim.sh build/shim
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libADOFAIShim
+          path: build/shim/
