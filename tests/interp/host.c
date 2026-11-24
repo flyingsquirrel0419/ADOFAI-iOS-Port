@@ -16,6 +16,7 @@ extern MonoDomain *mono_jit_init_version(const char *name, const char *ver);
 extern MonoAssembly *mono_domain_assembly_open(MonoDomain *d, const char *name);
 extern int mono_jit_exec(MonoDomain *d, MonoAssembly *a, int argc, char *argv[]);
 extern char *mono_get_runtime_build_info(void);
+extern void mono_config_parse(const char *filename);
 
 int main(int argc, char *argv[]) {
     if (argc < 4) { fprintf(stderr, "usage: host aot.dylib asmdir exe [args]\n"); return 2; }
@@ -28,6 +29,7 @@ int main(int argc, char *argv[]) {
     fprintf(stderr, "HOST: registered static AOT module mscorlib; runtime build info '%s'\n", mono_get_runtime_build_info());
     mono_jit_set_aot_mode(5 /* MONO_AOT_MODE_INTERP */);
     mono_set_assemblies_path(argv[2]);
+    mono_config_parse(NULL);   // dllmap (System.Native -> libmono-native 등). Unity 도 부른다
     MonoDomain *d = mono_jit_init_version("host", "v4.0.30319");
     if (!d) { fprintf(stderr, "HOST: init failed\n"); return 5; }
     MonoAssembly *a = mono_domain_assembly_open(d, argv[3]);
