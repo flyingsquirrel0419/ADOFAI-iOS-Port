@@ -106,7 +106,8 @@ static BOOL PropValue(UInt32 obj, const Addr *a, NSMutableData *out) {
         if (sel == FOURCC("stc1")) { PUT((UInt32)1); return YES; }
         if (sel == FOURCC("ltnc")) { PUT((UInt32)0); return YES; }
         if (sel == FOURCC("sfma") || sel == FOURCC("pfta")) {   // AudioStreamRangedDescription
-            AudioStreamRangedDescription d = { StreamFormat(), { SampleRate(), SampleRate() } }; PUT(d); return YES;
+            struct { AudioStreamBasicDescription f; AudioValueRange r; } d = { StreamFormat(), { SampleRate(), SampleRate() } };  // AudioStreamRangedDescription (macOS)
+            PUT(d); return YES;
         }
         return NO;
     }
