@@ -24,6 +24,8 @@ export CC="$(xcrun -f clang) -arch arm64"
 export CXX="$(xcrun -f clang++) -arch arm64"
 # 최신 clang(16+)에서 오류로 승격된 경고들은 Unity 툴체인(Xcode 12)에서는 경고였다 -> 경고로 되돌림
 COMPAT="-Wno-error=implicit-function-declaration -Wno-error=incompatible-function-pointer-types -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=implicit-int"
+#  - 새 SDK 의 stdbool.h 는 bool 을 _Bool 매크로로 정의 -> icall 시그니처 매크로 이름이 ICALL_SIG_TYPE__Bool 로 펼쳐짐
+COMPAT="$COMPAT -DICALL_SIG_TYPE__Bool=ICALL_SIG_TYPE_bool"
 export CFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g -Os $COMPAT"
 export CXXFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g -Os"
 export CPPFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK"
