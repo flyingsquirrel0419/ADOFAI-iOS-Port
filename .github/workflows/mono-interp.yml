@@ -6,6 +6,10 @@ name: mono-interp (1단계 검증)
 
 on:
   workflow_dispatch:
+    inputs:
+      opt:
+        description: "Mono C 최적화 (-Os 기본, -O0 / -O1 로 인터프리터 진단)"
+        default: "-Os"
   push:
     paths:
       - ci/build-mono.sh
@@ -15,6 +19,7 @@ on:
       - .github/workflows/mono-interp.yml
 
 env:
+  MONO_OPT: ${{ inputs.opt || '-Os' }}
   MONO_REPO: Unity-Technologies/mono
   MONO_COMMIT: 9d7c9afd266e523029fb0cab48e944e528e61e68   # 게임 v3.4.0 libmonobdwgc 의 explicit/9d7c9afd
 
@@ -30,7 +35,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: build/mono-prefix
-          key: unity-mono-${{ env.MONO_COMMIT }}-${{ hashFiles('ci/build-mono.sh') }}
+          key: unity-mono-${{ env.MONO_COMMIT }}-${{ env.MONO_OPT }}-${{ hashFiles('ci/build-mono.sh') }}
 
       - name: 도구 설치
         if: steps.cache.outputs.cache-hit != 'true'

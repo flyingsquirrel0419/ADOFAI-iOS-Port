@@ -26,8 +26,10 @@ export CXX="$(xcrun -f clang++) -arch arm64"
 COMPAT="-Wno-error=implicit-function-declaration -Wno-error=incompatible-function-pointer-types -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=implicit-int"
 #  - 새 SDK 의 stdbool.h 는 bool 을 _Bool 매크로로 정의 -> icall 시그니처 매크로 이름이 ICALL_SIG_TYPE__Bool 로 펼쳐짐
 COMPAT="$COMPAT -DICALL_SIG_TYPE__Bool=ICALL_SIG_TYPE_bool"
-export CFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g -Os $COMPAT"
-export CXXFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g -Os"
+OPT=${MONO_OPT:--Os}   # 인터프리터가 최신 clang 최적화에 깨지는지 가르기 위해 바꿀 수 있게 (MONO_OPT=-O0)
+echo ">>> optimization: $OPT"
+export CFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g $OPT $COMPAT"
+export CXXFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g $OPT"
 export CPPFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK"
 export MACSDKOPTIONS="$CFLAGS"
 

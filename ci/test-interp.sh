@@ -104,6 +104,16 @@ run "H1. JIT 허용 + --interpreter (순수 인터프리터)" "진단" "$MONO" -
 run "H2. JIT 허용 + --full-aot-interp" "진단" "$MONO" --full-aot-interp Test.exe all
 run "H3. JIT 허용 + --hybrid-aot (AOT+JIT, 인터프리터 없음)" "진단" "$MONO" --hybrid-aot Test.exe basic
 
+# H0. 비교: Homebrew 공식 Mono(같은 최신 clang 빌드)의 인터프리터
+if command -v brew >/dev/null; then
+    brew list mono >/dev/null 2>&1 || brew install mono >/dev/null 2>&1
+    BM=$(brew --prefix)/bin/mono
+    if [ -x "$BM" ]; then
+        "$(brew --prefix)/bin/mcs" -nologo -r:System.Core.dll -out:TestBrew.exe Test.cs >/dev/null 2>&1 &&
+        run "H0. Homebrew Mono $("$BM" --version | head -1 | awk '{print $5}') --interpreter" "진단" "$BM" --interpreter TestBrew.exe basic
+    fi
+fi
+
 # G. mscorlib 도 인터프리터로: 빈 AOT 프로필 + profile-only -> 메서드 코드 없이 트램폴린/래퍼만.
 #    인터프리터 -> AOT 코드 직접 호출(do_jit_call -> gsharedvt_out_sig) 경로가 없어진다 (D 에서 인자가 깨지는 경로)
 printf 'AOTPROFILE' > empty.aotprofile
