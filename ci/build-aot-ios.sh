@@ -7,7 +7,7 @@
 #   - runtime_version 일치   -> "6.13.0 (explicit/9d7c9afd)". mono 실행 파일은 main.c 에서 빌드 날짜를 붙이므로
 #                              빌드 날짜를 넣지 않는 임베딩 드라이버(mono_main 만 부름)로 컴파일한다
 #   - GC 이름 일치 (boehm)    -> libmonobdwgc 로 컴파일
-#   - --aot=interp            -> 인터프리터 트램폴린 포함
+#   - --aot=full,interp       -> 인터프리터 트램폴린 포함 (interp 만이면 트램폴린 0개: "Ran out of trampolines")
 # static 으로 만들어 shim 이 mono_aot_register_module 로 등록한다 (파일 경로 검색 불필요).
 set -euo pipefail
 PREFIX=$(cd "$1" && pwd)
@@ -21,7 +21,8 @@ echo ">>> runtime: $LIB"
 
 # 게임이 쓰는 클래스 라이브러리 프로필 (Unity 맥 플레이어: unityjit-macos). 없으면 4.5
 PROF=""
-for p in 4.5 unityjit-macos unityjit; do   # make install 이 4.5/ 에 unityjit-macos 를 넣는다 [ -f "$PREFIX/lib/mono/$p/mscorlib.dll" ] && { PROF=$p; break; }; done
+# make install 이 4.5/ 에 unityjit-macos 를 넣는다
+for p in 4.5 unityjit-macos unityjit; do [ -f "$PREFIX/lib/mono/$p/mscorlib.dll" ] && { PROF=$p; break; }; done
 [ -n "$PROF" ] || { echo "no mscorlib.dll"; ls "$PREFIX/lib/mono"; exit 1; }
 echo ">>> profile: $PROF"
 for p in "$PREFIX"/lib/mono/*/mscorlib.dll; do echo "    $(stat -f %z "$p") $p"; done
@@ -37,8 +38,8 @@ xcrun clang -arch arm64 "$W/aotdrv.c" -o "$W/aotdrv" "$LIB" -Wl,-rpath,"$(dirnam
 cp "$PREFIX/lib/mono/$PROF/mscorlib.dll" "$W/"
 
 cd "$W"
-echo ">>> AOT mscorlib (interp,static,asmonly)"
-MONO_PATH="$PREFIX/lib/mono/$PROF" ./aotdrv --aot=interp,static,asmonly,outfile=mscorlib.s mscorlib.dll 2>&1 | tail -20
+echo ">>> AOT mscorlib (full,interp,static,asmonly)"
+MONO_PATH="$PREFIX/lib/mono/$PROF" ./aotdrv --aot=full,interp,static,asmonly,outfile=mscorlib.s mscorlib.dll 2>&1 | tail -20
 ls -la mscorlib.s
 echo ">>> runtime_version / gc in image:"
 grep -a -m3 -E '6\.13\.0 \(|"boehm"|boehm' mscorlib.s || true

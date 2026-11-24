@@ -43,10 +43,13 @@ CSC="$PREFIX/bin/mcs"; [ -x "$CSC" ] || CSC="$PREFIX/bin/csc"
 "$CSC" -nologo -optimize+ -r:System.Core.dll -out:Test.exe Test.cs || { log "**테스트 컴파일 실패**"; exit 1; }
 export DYLD_LIBRARY_PATH="$W"
 
-# --- JIT 금지 mono 사본 (hardened runtime, allow-jit 없음) ---
-cp "$MONO" mono-nojit
-codesign -f -s - -o runtime --entitlements "$HERE/tests/interp/nojit.entitlements" mono-nojit
-codesign -d --entitlements - mono-nojit 2>&1 | tail -5
+# --- JIT 금지: iOS 처럼 실행 중 코드 생성을 막는 인터포저 (tests/interp/nojit.c) ---
+xcrun clang -arch arm64 -dynamiclib -o libnojit.dylib "$HERE/tests/interp/nojit.c"
+cat > mono-nojit <<EOS
+#!/bin/bash
+DYLD_INSERT_LIBRARIES="$W/libnojit.dylib" exec "$MONO" "\$@"
+EOS
+chmod +x mono-nojit
 
 run() {  # run <이름> <기대> <명령...>
     local name=$1 expect=$2; shift 2
@@ -68,7 +71,7 @@ run() {  # run <이름> <기대> <명령...>
 # A. 기준선: 일반 JIT
 run "A. JIT (기준선)" "전부 통과" "$MONO" Test.exe all
 
-# B. 음성 대조: JIT 금지 + JIT 모드 → 반드시 실패해야 함 (실패해야 강제가 걸렸다는 증거)
+# B. 음성 대조: JIT 금지 + JIT 모드 -> 반드시 실패해야 함 (실패해야 강제가 걸렸다는 증거)
 run "B. JIT 금지 + JIT 모드 (음성 대조)" "크래시/실패" ./mono-nojit Test.exe basic
 
 # C. JIT 금지 + 순수 인터프리터(AOT 이미지 없음) → 트램폴린을 실행 중 생성하려다 실패할 것으로 예상
@@ -76,12 +79,13 @@ run "C. JIT 금지 + --interpreter (AOT 없음)" "실패 예상" ./mono-nojit --
 
 # --- AOT(interp) 이미지 생성: 클래스 라이브러리 ---
 echo "::group::AOT --aot=interp"
-for a in mscorlib System System.Core; do
-    ( cd "$PROFILE_DIR" && "$MONO" --aot=interp "$a.dll" ) 2>&1 | tail -3
-done
+# mscorlib: full,interp (Xamarin.iOS 인터프리터 방식: 트램폴린 포함 + 기본 라이브러리는 네이티브 AOT 코드)
+( cd "$PROFILE_DIR" && "$MONO" --aot=full,interp mscorlib.dll ) 2>&1 | tail -3
+# 그 밖의 어셈블리 (게임 DLL 역할): interp 만 (래퍼만; 코드는 인터프리터)
+for a in System System.Core; do ( cd "$PROFILE_DIR" && "$MONO" --aot=interp "$a.dll" ) 2>&1 | tail -3; done
 "$MONO" --aot=interp Test.exe 2>&1 | tail -3
 echo "::endgroup::"
-log "- AOT 이미지: $(cd "$PROFILE_DIR" && ls *.dll.dylib 2>/dev/null | tr '\n' ' ') $(ls Test.exe.dylib 2>/dev/null)"
+log "- AOT 이미지: $(cd "$PROFILE_DIR" && ls -la mscorlib.dll.dylib System.dll.dylib System.Core.dll.dylib 2>/dev/null | awk '{print $9" "$5}' | tr '\n' ' ') $(ls Test.exe.dylib 2>/dev/null)"
 log "- 크기: $(cd "$PROFILE_DIR" && du -ch *.dll.dylib 2>/dev/null | tail -1)"
 log ""
 

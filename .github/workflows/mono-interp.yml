@@ -10,6 +10,7 @@ on:
     paths:
       - ci/build-mono.sh
       - ci/test-interp.sh
+      - ci/build-aot-ios.sh
       - tests/interp/**
       - .github/workflows/mono-interp.yml
 
@@ -81,6 +82,14 @@ jobs:
 
       - name: 인터프리터 검증
         run: bash ci/test-interp.sh build/mono-prefix build/interp-test
+
+      - name: iOS 용 mscorlib AOT 이미지 (libADOFAIAot.dylib)
+        run: bash ci/build-aot-ios.sh build/mono-prefix build/mono-aot-ios
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mono-aot-ios
+          path: build/mono-aot-ios/
 
       - uses: actions/upload-artifact@v4
         if: always()
