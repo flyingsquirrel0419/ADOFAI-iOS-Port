@@ -98,6 +98,21 @@ run "E1. JIT 금지 + --full-aot-interp (Test.exe AOT 없음) basic" "통과하�
 run "E2. 같은 조건 callback" "reverse P/Invoke 래퍼 필요 여부" ./mono-nojit --full-aot-interp Test.exe callback
 mv Test.exe.dylib.off Test.exe.dylib 2>/dev/null
 
+# G. mscorlib 도 인터프리터로: 빈 AOT 프로필 + profile-only -> 메서드 코드 없이 트램폴린/래퍼만.
+#    인터프리터 -> AOT 코드 직접 호출(do_jit_call -> gsharedvt_out_sig) 경로가 없어진다 (D 에서 인자가 깨지는 경로)
+printf 'AOTPROFILE' > empty.aotprofile
+printf '\x00\x00\x01\x00\x00\x00\x00\x00\x00' >> empty.aotprofile   # version 0x00010000 (LE), RECORD_NONE, id 0
+cp "$PROFILE_DIR/mscorlib.dll.dylib" mscorlib.full.dylib
+echo "::group::AOT mscorlib profile-only"
+( cd "$PROFILE_DIR" && "$MONO" --aot=full,interp,profile="$W/empty.aotprofile",profile-only mscorlib.dll ) 2>&1 | tail -5
+echo "::endgroup::"
+log "- profile-only mscorlib AOT: $(ls -la "$PROFILE_DIR/mscorlib.dll.dylib" | awk '{print $5}') bytes (full: $(ls -la mscorlib.full.dylib | awk '{print $5}'))"
+run "G1. JIT 금지 + mscorlib profile-only (전부 인터프리터)" "전부 통과" ./mono-nojit --full-aot-interp Test.exe all
+mv Test.exe.dylib Test.exe.dylib.off 2>/dev/null
+run "G2. 같은 조건, Test.exe AOT 없음 (게임 DLL 역할)" "전부 통과" ./mono-nojit --full-aot-interp Test.exe all
+mv Test.exe.dylib.off Test.exe.dylib 2>/dev/null
+cp mscorlib.full.dylib "$PROFILE_DIR/mscorlib.dll.dylib"
+
 # F. 성능: JIT 대비 인터프리터
 run "F1. bench JIT" "-" "$MONO" Test.exe bench
 run "F2. bench interp (JIT 금지)" "-" ./mono-nojit --full-aot-interp Test.exe bench
