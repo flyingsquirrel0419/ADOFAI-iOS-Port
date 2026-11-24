@@ -43,6 +43,9 @@ jobs:
           git remote add origin https://github.com/$MONO_REPO.git
           git fetch -q --depth 1 origin $MONO_COMMIT
           git checkout -q FETCH_HEAD
+          # 게임 런타임의 FULL_VERSION 은 "explicit/9d7c9afd" (8자리). AOT 이미지 runtime_version 이 일치해야 하므로 맞춘다.
+          git config core.abbrev 8
+          git log -n1 --pretty=format:%h; echo
           # 빌드에 필요 없는 큰 서브모듈 제외 (llvm, boringssl, 테스트 바이너리)
           skip="external/llvm-project external/boringssl external/helix-binaries external/illinker-test-assets external/xunit-binaries external/bockbuild"
           for p in $(git config -f .gitmodules --get-regexp 'submodule\..*\.path' | awk '{print $2}'); do

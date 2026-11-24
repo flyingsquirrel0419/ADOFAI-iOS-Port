@@ -53,3 +53,10 @@ iOS는 사이드로드 앱의 런타임 코드 생성(JIT)을 금지 → Mono JI
 4. Steam 대체, 클라우드 세이브, IPA (GitHub Actions)
 
 원칙: 게임 파일은 저장소/IPA에 포함하지 않음. 사용자 본인 계정으로 받은 파일을 사용자 기기에서 변환.
+
+## AOT 이미지 호환성 (aot-runtime.c)
+- AOT 이미지의 `runtime_version` 이 런타임의 `mono_get_runtime_build_info()` 와 같아야 로드됨.
+- 게임 런타임(임베디드)은 `mono_build_date` 가 NULL → `"6.13.0 (explicit/9d7c9afd)"`.
+- `mono` 실행 파일로 AOT 하면 main.c 가 build_date 를 넣어서 `"6.13.0 (explicit/9d7c9afd <날짜>)"` 가 됨 → 불일치.
+  → 2단계에서 게임용 AOT는 build_date 를 넣지 않는 임베딩 드라이버로 컴파일하거나, 이미지의 문자열을 맞춘다.
+- 커밋 해시 길이도 맞춰야 함 (CI 얕은 클론은 7자리 → `core.abbrev 8`).
