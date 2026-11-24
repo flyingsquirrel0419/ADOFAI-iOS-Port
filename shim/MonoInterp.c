@@ -36,13 +36,15 @@ static void RegisterAotModules(void) {
     }
     void *h = dlopen(path, RTLD_NOW | RTLD_GLOBAL);
     if (!h) { ShimLog("mono: libADOFAIAot.dylib not loaded (%s) - interpreter needs the mscorlib AOT image", dlerror() ?: "?"); return; }
-    static const char *mods[] = { "mscorlib", "System", "System.Core", "Mono.Security", NULL };   // aname 그대로 (aot-compiler.c)
+    // 심볼 이름: 어셈블리 이름의 영숫자가 아닌 문자는 '_' (aot-compiler.c)
+    static const char *mods[] = { "mscorlib", "System", "System_Core", "Mono_Security", NULL };
     for (int i = 0; mods[i]; i++) {
         char sym[128];
         snprintf(sym, sizeof sym, "mono_aot_module_%s_info", mods[i]);
-        void **info = (void **)dlsym(h, sym);
-        if (!info) continue;
-        reg(info);
+        // 심볼은 MonoAotFileInfo 를 가리키는 포인터를 가리킨다 (aot-compiler.c emit_aot_file_info)
+        void ***p = (void ***)dlsym(h, sym);
+        if (!p || !*p) continue;
+        reg(*p);
         ShimLog("mono: registered static AOT module %s", mods[i]);
     }
 }

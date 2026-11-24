@@ -21,9 +21,10 @@ int main(int argc, char *argv[]) {
     if (argc < 4) { fprintf(stderr, "usage: host aot.dylib asmdir exe [args]\n"); return 2; }
     void *h = dlopen(argv[1], RTLD_NOW);
     if (!h) { fprintf(stderr, "HOST: dlopen %s: %s\n", argv[1], dlerror()); return 3; }
-    void **info = dlsym(h, "mono_aot_module_mscorlib_info");
-    if (!info) { fprintf(stderr, "HOST: no mono_aot_module_mscorlib_info\n"); return 4; }
-    mono_aot_register_module(info);
+    // 심볼은 MonoAotFileInfo 를 가리키는 포인터를 가리킨다 (aot-compiler.c emit_aot_file_info)
+    void ***sym = dlsym(h, "mono_aot_module_mscorlib_info");
+    if (!sym) { fprintf(stderr, "HOST: no mono_aot_module_mscorlib_info\n"); return 4; }
+    mono_aot_register_module(*sym);
     fprintf(stderr, "HOST: registered static AOT module mscorlib; runtime build info '%s'\n", mono_get_runtime_build_info());
     mono_jit_set_aot_mode(5 /* MONO_AOT_MODE_INTERP */);
     mono_set_assemblies_path(argv[2]);
