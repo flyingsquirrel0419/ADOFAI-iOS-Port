@@ -24,9 +24,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 빌드 캐시
+      - name: 빌드 캐시 (복원)
         id: cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: build/mono-prefix
           key: unity-mono-${{ env.MONO_COMMIT }}-${{ hashFiles('ci/build-mono.sh') }}
@@ -67,6 +67,13 @@ jobs:
       - name: Mono 빌드
         if: steps.cache.outputs.cache-hit != 'true'
         run: bash ci/build-mono.sh mono-src build/mono-prefix 2>&1 | tee build-mono.log | grep -E '^>>>|error:|Error |\*\*\*' || true; test -x build/mono-prefix/bin/mono
+
+      - name: 빌드 캐시 (저장; 뒤 단계가 실패해도 Mono 를 다시 빌드하지 않도록)
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: build/mono-prefix
+          key: ${{ steps.cache.outputs.cache-primary-key }}
 
       - name: 빌드 로그 (실패 시)
         if: failure()

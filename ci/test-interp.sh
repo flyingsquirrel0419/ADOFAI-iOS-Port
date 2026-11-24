@@ -24,6 +24,13 @@ log "- profiles: $(ls "$PREFIX/lib/mono" | tr '\n' ' ')"
 log "- runtime libs: $(ls "$PREFIX/lib" | grep -E 'libmono.*dylib$' | tr '\n' ' ')"
 log ""
 
+# --- 진단: 클래스 라이브러리 로딩 ---
+echo "::group::corlib 진단"
+ls -la "$PROFILE_DIR"/mscorlib* "$PROFILE_DIR"/mcs.exe 2>&1
+MONO_LOG_LEVEL=debug MONO_LOG_MASK=asm,dll,cfg "$PREFIX/bin/mono" "$PROFILE_DIR/mcs.exe" --version 2>&1 | grep -viE "^Mono: DllImport|probing" | tail -40
+MONO_LOG_LEVEL=debug MONO_LOG_MASK=asm "$MONO" "$PROFILE_DIR/mcs.exe" --version 2>&1 | tail -15
+echo "::endgroup::"
+
 # --- 테스트 빌드 ---
 cd "$W"
 cp "$HERE/tests/interp/Test.cs" .
