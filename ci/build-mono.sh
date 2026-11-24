@@ -22,13 +22,20 @@ echo ">>> bootstrap mcs: $BOOT_MCS"; mcs --version
 
 export CC="$(xcrun -f clang) -arch arm64"
 export CXX="$(xcrun -f clang++) -arch arm64"
-export CFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g -Os"
-export CXXFLAGS="$CFLAGS"
+# 최신 clang(16+)에서 오류로 승격된 경고들은 Unity 툴체인(Xcode 12)에서는 경고였다 -> 경고로 되돌림
+COMPAT="-Wno-error=implicit-function-declaration -Wno-error=incompatible-function-pointer-types -Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=implicit-int"
+export CFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g -Os $COMPAT"
+export CXXFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK -g -Os"
 export CPPFLAGS="-mmacosx-version-min=$MACVER -isysroot $SDK"
 export MACSDKOPTIONS="$CFLAGS"
 
 cd "$SRC"
 rm -f config.status eglib/config.status libgc/config.status
+
+# 최신 Xcode SDK 호환 (Unity 는 SDK 11 로 빌드). 생성되는 기계어는 같다 - 이름만 다른 경우만 고친다.
+#  - objc/message.h: 일반 C 에서도 struct objc_super 의 멤버가 super_class 로 바뀜 (같은 위치)
+sed -i '' 's/super\.class = nsobject;/super.super_class = nsobject;/' mono/utils/mono-threads-mach-helper.c
+grep -n "super_class = nsobject" mono/utils/mono-threads-mach-helper.c
 
 # build.pl 과 같은 인자 (+ boringssl 서브모듈을 받지 않으므로 btls 끔)
 ./autogen.sh \
