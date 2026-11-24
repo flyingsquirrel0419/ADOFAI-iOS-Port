@@ -264,7 +264,7 @@ static void HostLayer(CALayer *l) {
 @implementation NSView
 - (instancetype)init { return [self initWithFrame:CGRectZero]; }
 - (instancetype)initWithFrame:(CGRect)f {
-    if ((self = [super init])) { ShimScreen s = ShimScreenInfo(); _frame = CGRectMake(0, 0, s.w, s.h); _bounds = _frame; _subviews = [NSMutableArray array]; }
+    if ((self = [super init])) { _subviews = [NSMutableArray array]; }   // frame/bounds 는 항상 전체화면 (getter 참고)
     return self;
 }
 - (void)setFrame:(CGRect)f { /* 항상 전체화면 */ }
